@@ -1,0 +1,38 @@
+[
+    {
+        "full_name": "MEDIAN HOUSEHOLD INCOME IN THE PAST 12 MONTHS (IN 2013 INFLATION-ADJUSTED DOLLARS)",
+        "helper_label": "Median Annual Household Income",
+        "code": "B19013_001E",
+        "year": "2013"
+    },
+    {
+        "full_name": "MEDIAN MONTHLY HOUSING COSTS (DOLLARS)",
+        "helper_label": "Median Monthly Housing Costs",
+        "code": "B25105_001E",
+        "year": "2013"
+    },
+    {
+        "full_name": "MEDIAN VALUE (DOLLARS)",
+        "helper_label": "Median Value for Owner Occupied Housing Units",
+        "code": "B25077_001E",
+        "year": "2013"
+    },
+    {
+        "full_name": "MEDIAN HOUSEHOLD INCOME IN THE PAST 12 MONTHS (IN 2018 INFLATION-ADJUSTED DOLLARS)",
+        "helper_label": "Median Annual Household Income",
+        "code": "B19013_001E",
+        "year": "2018"
+    },
+    {
+        "full_name": "MEDIAN MONTHLY HOUSING COSTS (DOLLARS)",
+        "helper_label": "Median Monthly Housing Costs",
+        "code": "B25105_001E",
+        "year": "2018"
+    },
+    {
+        "full_name": "MEDIAN VALUE (DOLLARS)",
+        "helper_label": "Median Value for Owner Occupied Housing Units",
+        "code": "B25077_001E",
+        "year": "2018"
+    }
+]
