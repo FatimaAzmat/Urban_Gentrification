@@ -1,10 +1,9 @@
 """
-Preprocessing Module for PCA Analysis - Predicting Gentrification in US Cities
-@Author Marc Richardson
-@Last Updated: May 25, 2020
+ACSData class for preprocessing
+
+@author: Marc Richardson
+@last updated: May 25, 2020
 - Currently supports only ACS 5-year data for Cook County of Illinois
-- The output of the module is a csv file that is ready to be fed into the PCA
-  analysis
 """
 
 # import libraries

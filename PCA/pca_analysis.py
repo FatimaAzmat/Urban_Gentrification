@@ -1,9 +1,9 @@
 """
 PCA Analysis
-@author Marc Richardson
-@Last Updated May 25, 2020
+@author: Marc Richardson
+@last updated: May 25, 2020
 
-Does the PCA analysis on the two datasets
+Does the PCA analysis on the two datasets, saves the input and output to a csv
 """
 
 # import libraries
