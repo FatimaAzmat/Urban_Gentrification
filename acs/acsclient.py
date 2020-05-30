@@ -1,7 +1,10 @@
 '''
+acsclient.py
+
 Provides access to American Community Survey (ACS) tables and variables
 created by the U.S. Census Bureau. 
 '''
+
 import censusdata as census
 import pandas as pd
 import requests
@@ -29,7 +32,9 @@ def get_census_estimate_vars(source, year, base_table_code, filters):
 
     The estimate variable shown above has the code "B11011_007E"; the base part
     of its code before the underscore indicates that it comes from the table 
-    "B11011". Its label is "Estimate!!Total!!Family households!!Other family". 
+    "B11011". Its label is "Estimate!!Total!!Family households!!Other family".
+
+    Note: This function was used in the initial data exploration process.
     
     Parameters:
         source (str): the ACS data source (e.g., 'acs5')
@@ -40,12 +45,13 @@ def get_census_estimate_vars(source, year, base_table_code, filters):
     Returns:
         (list of strings): the variable codes
     '''
-    r = requests.get(f"https://api.census.gov/data/{year}/acs/{source}/variables.json")
+    r = requests.get(
+        url=f"https://api.census.gov/data/{year}/acs/{source}/variables.json")
     
-    variables = [f"{base_table_code}_001E"]
+    variables = [f"{base_table_code}001E"]
     
-    for k, v in r.json()["variables"].items():  
-        if base_table_code in k and k.endswith("E") and v["label"].lower() in filters:
+    for k, v in r.json()["variables"].items():
+        if k.startswith(base_table_code) and k.endswith("E") and v["label"].lower() in filters:
             variables.append(k)
     
     return variables
@@ -53,7 +59,7 @@ def get_census_estimate_vars(source, year, base_table_code, filters):
 
 def get_census_tracts(source, year, geomapping, var_codes):
     '''
-    Retrieves all the census tracts for a given GeoMapping.
+    Retrieves variable codes for the census tracts for a given GeoMapping.
 
     Parameters:
         source (str): the ACS data source (e.g., 'acs5')

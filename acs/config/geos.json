@@ -86,7 +86,7 @@
     {
         "city": {
             "name": "Washington D.C.",
-            "fips_code": ""
+            "fips_code": "50000"
         },
         "state": {
             "name": "District of Columbia",

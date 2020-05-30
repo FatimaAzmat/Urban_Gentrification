@@ -1,8 +1,11 @@
 '''
 models.py
+
+Representations of ACS geographies and data requests.
 '''
+
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 
 @dataclass
 class Geo:
@@ -25,36 +28,12 @@ class GeoMapping:
 
 
 @dataclass
-class ACSVariable:
-    '''
-    Represents a generic variable in the American Community Survey.
-    '''
-    full_name: str
-    helper_label: str
-    code: str
-    year: int
-
-
-@dataclass
-class ACSTable:
-    '''
-    Represents a generic table in the American Community Survey.
-    '''
-    full_name: str
-    helper_label: str
-    code: str
-    year: int
-    filters: List[str]
-
-
-@dataclass
 class ACSDataRequest:
     '''
-    Represents the parameters of a data request for the Census Bureau API
+    Represents the parameters of a data request for the Census Bureau API.
     '''
     acs: str
     cities: List[str]
     year: int
     geomaps: List[GeoMapping]
-    tables: List[ACSTable]
-    variables: List[ACSVariable]
+    variables: Dict[str, str]
