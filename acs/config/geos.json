@@ -1,0 +1,102 @@
+[
+    {
+        "city": {
+            "name": "Chicago",
+            "fips_code": "14000"
+        },
+        "state": {
+            "name": "Illinois",
+            "fips_code": "17"
+        },
+        "counties": [
+            {
+                "name": "Cook County",
+                "fips_code": "031"
+            },
+            {
+                "name": "DuPage County",
+                "fips_code": "043"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "New York City",
+            "fips_code": "51000"
+        },
+        "state": {
+            "name": "New York",
+            "fips_code": "36"
+        },
+        "counties": [
+            {
+                "name": "New York County",
+                "fips_code": "061"
+            },
+            {
+                "name": "Kings County",
+                "fips_code": "047"
+            },
+            {
+                "name": "Bronx County",
+                "fips_code": "005"
+            },
+            {
+                "name": "Richmond County",
+                "fips_code": "085"
+            },
+            {
+                "name": "Queens County",
+                "fips_code": "081"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "San Francisco",
+            "fips_code": "67000"
+        },
+        "state": {
+            "name": "California",
+            "fips_code": "06"
+        },
+        "counties": [
+            {
+                "name": "San Francisco County",
+                "fips_code": "075"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Seattle",
+            "fips_code": "63000"
+        },
+        "state": {
+            "name": "Washington",
+            "fips_code": "53"
+        },
+        "counties": [
+            {
+                "name": "King County",
+                "fips_code": "033"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Washington D.C.",
+            "fips_code": "50000"
+        },
+        "state": {
+            "name": "District of Columbia",
+            "fips_code": "11"
+        },
+        "counties": [
+            {
+                "name": "District of Columbia",
+                "fips_code": "001"
+            }
+        ]
+    }
+]

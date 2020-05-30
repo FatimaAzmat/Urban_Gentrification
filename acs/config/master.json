@@ -1,0 +1,11 @@
+{
+    "acs": "acs5",
+    "cities": [
+        "Chicago",
+        "New York City",
+        "San Francisco",
+        "Seattle",
+        "Washington D.C."
+    ],
+    "year": 2010
+}
