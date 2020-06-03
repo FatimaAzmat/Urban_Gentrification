@@ -98,5 +98,298 @@
                 "fips_code": "001"
             }
         ]
+    },
+    {
+        "city": {
+            "name": "Pittsburg",
+            "fips_code": "61000"
+        },
+        "state": {
+            "name": "Pennsylvania",
+            "fips_code": "42"
+        },
+        "counties": [
+            {
+                "name": "Allegheny",
+                "fips_code": "003"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Portland",
+            "fips_code": "59000"
+        },
+        "state": {
+            "name": "Oregon",
+            "fips_code": "41"
+        },
+        "counties": [
+            {
+                "name": "Multnomah",
+                "fips_code": "051"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Atlanta",
+            "fips_code": "04000"
+        },
+        "state": {
+            "name": "Georgia",
+            "fips_code": "13"
+        },
+        "counties": [
+            {
+                "name": "Fulton",
+                "fips_code": "121"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Philadelphia",
+            "fips_code": "60000"
+        },
+        "state": {
+            "name": "Pennsylvania",
+            "fips_code": "42"
+        },
+        "counties": [
+            {
+                "name": "Philadelphia",
+                "fips_code": "101"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Minneapolis",
+            "fips_code": "43000"
+        },
+        "state": {
+            "name": "Minnesota",
+            "fips_code": "27"
+
+        },
+        "counties": [
+            {
+                "name": "Hennepin",
+                "fips_code": "053"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "New Orleans",
+            "fips_code": "55000"
+        },
+        "state": {
+            "name": "Louisiana",
+            "fips_code": "22"
+
+        },
+        "counties": [
+            {
+                "name": "Orleans",
+                "fips_code": "071"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Los Angeles",
+            "fips_code": "44000"
+        },
+        "state": {
+            "name": "California",
+            "fips_code": "06"
+
+        },
+        "counties": [
+            {
+                "name": "Los Angeles",
+                "fips_code": "037"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Albuquerque",
+            "fips_code": "02000"
+        },
+        "state": {
+            "name": "New Mexico",
+            "fips_code": "35"
+
+        },
+        "counties": [
+            {
+                "name": "Bernalillo",
+                "fips_code": "001"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Tulsa",
+            "fips_code": "75000"
+        },
+        "state": {
+            "name": "Oklahoma",
+            "fips_code": "40"
+
+        },
+        "counties": [
+            {
+                "name": "Tulsa",
+                "fips_code": "143"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "San Diego",
+            "fips_code": "66000"
+        },
+        "state": {
+            "name": "California",
+            "fips_code": "06"
+        },
+        "counties": [
+            {
+                "name": "San Diego",
+                "fips_code": "073"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Houston",
+            "fips_code": "35000"
+        },
+        "state": {
+            "name": "Texas",
+            "fips_code": "48"
+        },
+        "counties": [
+            {
+                "name": "Harris",
+                "fips_code": "201"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Boston",
+            "fips_code": "07000"
+        },
+        "state": {
+            "name": "Massachusetts",
+            "fips_code": "25"
+        },
+        "counties": [
+            {
+                "name": "Suffolk",
+                "fips_code": "025"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Jersey City",
+            "fips_code": "36000"
+        },
+        "state": {
+            "name": "New Jersey",
+            "fips_code": "34"
+        },
+        "counties": [
+            {
+                "name": "Hudson",
+                "fips_code": "017"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Austin",
+            "fips_code": "05000"
+        },
+        "state": {
+            "name": "Texas",
+            "fips_code": "48"
+        },
+        "counties": [
+            {
+                "name": "Travis",
+                "fips_code": "017"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Baltimore",
+            "fips_code": "04000"
+        },
+        "state": {
+            "name": "Maryland",
+            "fips_code": "24"
+        },
+        "counties": [
+            {
+                "name": "Baltimore City",
+                "fips_code": "510"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Detroit",
+            "fips_code": "22000"
+        },
+        "state": {
+            "name": "Michigan",
+            "fips_code": "26"
+        },
+        "counties": [
+            {
+                "name": "Wayne",
+                "fips_code": "163"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Miami",
+            "fips_code": "45000"
+        },
+        "state": {
+            "name": "Florida",
+            "fips_code": "12"
+        },
+        "counties": [
+            {
+                "name": "Miami-Dade",
+                "fips_code": "086"
+            }
+        ]
+    },
+    {
+        "city": {
+            "name": "Charlotte",
+            "fips_code": "12000"
+        },
+        "state": {
+            "name": "North Carolina",
+            "fips_code": "37"
+        },
+        "counties": [
+            {
+                "name": "Mecklenburg",
+                "fips_code": "119"
+            }
+        ]
     }
 ]

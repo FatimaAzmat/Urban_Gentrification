@@ -10,6 +10,7 @@ import csv
 import json
 import jsons
 import pandas as pd
+import logging
 
 from models import GeoMapping, ACSDataRequest
 from typing import List
@@ -730,33 +731,6 @@ def _compute_percent_white_collar(df):
     ])
 
 
-def _get_table_variables(acs, year, tables):
-    '''
-    Filters a list of ACSTables to include only those pertaining to the given
-    year and then calls the Census Bureau API endpoint to receive all of the
-    specified estimate variables for those tables.
-
-    Parameters:
-        acs (str): the ACS data source (e.g., 'acs5')
-        year (int): the publication year for the ACS data (e.g., 2013)
-        tables (list of ACSTable): the tables for which to retrieve data
-
-    Returns:
-        (list of str): the table variable codes
-    '''
-    var_codes = []
-    for table in tables:
-        table_var_codes = acsclient.get_census_estimate_vars(
-            source=acs,
-            year=year,
-            base_table_code=table.code,
-            filters=table.filters
-        )
-        var_codes.extend(table_var_codes)
-    
-    return var_codes
-
-
 def _parse_config(config_folder_path):
     '''
     Parses a set of configuration files to retrieve the geographies, tables,
@@ -774,7 +748,7 @@ def _parse_config(config_folder_path):
         master_settings = json.load(f)
         acs = master_settings["acs"]
         cities = master_settings["cities"]
-        year = master_settings["year"]
+        years = master_settings["years"]
 
     # Retrieve geographies and filter by city name
     with open(f"{config_folder_path}/geos.json") as f:
@@ -785,13 +759,16 @@ def _parse_config(config_folder_path):
                 geomaps.append(geomapping)
 
     # Retrieve variables for given year and parse into dictionary
-    with open(f"{config_folder_path}/variables/{year}.csv") as f:
-        var_dict = {}
-        csv_reader = csv.DictReader(f)
-        for row in csv_reader:
-            var_dict[row["Code"]] = row["VariableCustomName"]
+    all_var_dicts = {}
+    for year in years:
+        with open(f"{config_folder_path}/variables/{year}.csv") as f:
+            var_dict = {}
+            csv_reader = csv.DictReader(f)
+            for row in csv_reader:
+                var_dict[row["Code"]] = row["VariableCustomName"]
+            all_var_dicts[year] = var_dict
 
-    return ACSDataRequest(acs, cities, year, geomaps, var_dict)
+    return ACSDataRequest(acs, cities, years, geomaps, all_var_dicts)
 
 
 def _reshape_dataframe(df, variable_dict, year):
@@ -811,7 +788,7 @@ def _reshape_dataframe(df, variable_dict, year):
     '''
 
     # Replace variable code column names with meaningful labels
-    updated_df = df.rename(columns=variable_dict)
+    updated_df = df.rename(columns=variable_dict[year])
 
     # Update educational attainment column using custom logic
     compute_by_sex = year == 2010 or year == 2011
@@ -863,15 +840,17 @@ def _write_output_files(df, acs, year, output_folder_path):
     # Define output columns for CSV file holding socioeconomic data only
     # (To be used for calculating socioeconomic ascent outcome variable)
     socioeconomic_vars = [
-        "state",
-        "county",
+        "State",
+        "County",
+        "Affiliated City",
         "geo11",
-        "year",
+        "Year",
         "Median Annual Household Income",
         "Median Monthly Housing Costs",
         "Median Value for Owner Occupied Housing Units",
         "Percent White Collar",
-        "Percent College Graduate"
+        "Percent College Graduate",
+        "Total Population"
     ]
 
     # Write ACS features to CSV file
@@ -900,31 +879,40 @@ def orchestrate(config_folder_path, output_folder_path):
     # Get ACS data request
     acsreq = _parse_config(config_folder_path)
 
-    # Initialize DataFrame
-    df = pd.DataFrame()
+    # Process data for each year
+    for year in acsreq.years:
 
-    # Retrieve variable codes (e.g. "B08303_003E") and add "GEO_ID" by default
-    var_codes = list(acsreq.variables.keys())
-    var_codes.append("GEO_ID")
+        logging.info(f"Processing ACS data for {year}")
 
-    # Retrieve census data from API
-    for geomap in acsreq.geomaps:
-        temp_df = acsclient.get_census_tracts(
-            source=acsreq.acs,
-            year=acsreq.year,
-            geomapping=geomap,
-            var_codes=var_codes
-        )
-        df = pd.concat([df, temp_df])
-        
-    # Reshape DataFrame
-    df = _reshape_dataframe(df, acsreq.variables, acsreq.year)
+        # Initialize DataFrame
+        df = pd.DataFrame()
 
-    # Write to output csv
-    _write_output_files(df, acsreq.acs, acsreq.year, output_folder_path)
+        # Retrieve variable codes (e.g. "B08303_003E") and add "GEO_ID"
+        var_codes = list(acsreq.variables[year].keys())
+        var_codes.append("GEO_ID")
+
+        # Retrieve census data from API
+        for geomap in acsreq.geomaps:
+            logging.info(f"Calling API for {geomap.city.name}")
+            temp_df = acsclient.get_census_tracts(
+                source=acsreq.acs,
+                year=year,
+                geomapping=geomap,
+                var_codes=var_codes
+            )
+            df = pd.concat([df, temp_df])
+            
+        # Reshape DataFrame
+        logging.info(f"Reshaping resulting DataFrame")
+        df = _reshape_dataframe(df, acsreq.variables, year)
+
+        # Write to output csv
+        logging.info(f"Writing data to output CSV files")
+        _write_output_files(df, acsreq.acs, year, output_folder_path)
 
    
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     config_folder_path = "acs/config"
     output_folder_path = "acs/outputs"
     orchestrate(config_folder_path, output_folder_path)
