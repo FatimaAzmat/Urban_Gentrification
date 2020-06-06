@@ -80,9 +80,10 @@ def get_census_tracts(source, year, geomapping, var_codes):
             ("tract", "*")])
 
         downloaded = census.download(source, year, tracts, var_codes)
-        downloaded.insert(loc=0, column="state", value=geomapping.state.name)
-        downloaded.insert(loc=1, column="county", value=county.name)
-        downloaded.insert(loc=2, column="year", value=year)
+        downloaded.insert(loc=0, column="State", value=geomapping.state.name)
+        downloaded.insert(loc=1, column="County", value=county.name)
+        downloaded.insert(loc=2, column="Affiliated City", value=geomapping.city.name)
+        downloaded.insert(loc=3, column="Year", value=year)
 
         df = pd.concat([df, downloaded])
 

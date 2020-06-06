@@ -34,6 +34,6 @@ class ACSDataRequest:
     '''
     acs: str
     cities: List[str]
-    year: int
+    years: List[int]
     geomaps: List[GeoMapping]
-    variables: Dict[str, str]
+    variables: Dict[int, Dict[str, str]]
