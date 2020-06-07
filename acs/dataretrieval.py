@@ -879,6 +879,9 @@ def orchestrate(config_folder_path, output_folder_path):
     # Get ACS data request
     acsreq = _parse_config(config_folder_path)
 
+    # Store DataFrames
+    df_collection = {}
+
     # Process data for each year
     for year in acsreq.years:
 
@@ -909,6 +912,11 @@ def orchestrate(config_folder_path, output_folder_path):
         # Write to output csv
         logging.info(f"Writing data to output CSV files")
         _write_output_files(df, acsreq.acs, year, output_folder_path)
+
+        # Store in dictionary
+        df_collection[year] = df
+
+    return df_collection
 
    
 if __name__ == "__main__":
