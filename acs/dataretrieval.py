@@ -809,12 +809,6 @@ def _compute_median_house_price_endo_features(df, shpfile_path):
     scol_morans_name = "Median House Value Local Morans"
     mrged[scol_morans_name] = Moran_Local(mrged[col_name].values, w).Is
 
-    # Normalize Local Moran's values
-    scaler = StandardScaler()
-    two_dim_values = mrged[scol_morans_name].to_numpy().reshape(-1, 2)
-    norm_data = scaler.fit_transform(two_dim_values).flatten()
-    mrged[scol_morans_name] = norm_data
-
     # Finalize DataFrame to return
     df = df.merge(mrged[["GEO_ID", scol_lag_name, scol_morans_name]], how="left", on="GEO_ID")
     return df.set_index("GEO_ID")
@@ -1026,4 +1020,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     config_folder_path = "acs/config"
     output_folder_path = "acs/outputs"
-    orchestrate(config_folder_path, output_folder_path, "houston2010.json")
+    orchestrate(config_folder_path, output_folder_path)
