@@ -1,18 +1,29 @@
 '''
 dataretrieval.py
+@author: Launa Greer
+@last updated: June 9, 2020
 
-Orchestrates the collection of ACS variables related to gentrification.
+Orchestrates the collection and engineering of ACS variables
+related to gentrification.
 '''
 
 import acsclient
 import censusdata as census
 import csv
+import geopandas as gpd
 import json
 import jsons
-import pandas as pd
 import logging
+import numpy as np
+import os
+import pandas as pd
+import pysal
 
+from esda.moran import Moran_Local
 from models import GeoMapping, ACSDataRequest
+from pysal.lib.weights.spatial_lag import lag_spatial
+from scipy.stats import gmean
+from sklearn.preprocessing import normalize, StandardScaler
 from typing import List
 
 
@@ -731,7 +742,85 @@ def _compute_percent_white_collar(df):
     ])
 
 
-def _parse_config(config_folder_path):
+def compute_gmean(df, tract, weights, column):
+    '''
+    Computes the geometric mean of the given column.
+    '''
+    # Compute county medians
+    county_median_df = df[["County", column]].groupby("County").median()
+
+    # Extract values from neighboring tracts, if any exist
+    neighbor_values = df.loc[weights.neighbors[tract], column].values
+    has_neighbors = not all(np.isnan(neighbor_values))
+
+    # Compute and return geometric mean
+    if has_neighbors:
+        active = neighbor_values[np.logical_not(np.isnan(neighbor_values))]
+        geomean = gmean(active)
+    else:
+        county = df.loc[tract, "County"]
+        geomean = county_median_df.loc[county][0]
+
+    return geomean
+
+
+def _compute_median_house_price_endo_features(df, shpfile_path):
+    '''
+    Computes two endogenous features (spatial lag and a Local Moran's statistic)
+    for the median value for owner occupied housing units in each tract.
+
+    Parameters:
+        df (pd.DataFrame): a DataFrame pertaining to a particular state
+        shpfile_path (str): the relative path to the state's shape file
+
+    Returns:
+        (pd.DataFrame): the updated DataFrame
+    '''
+    # Copy DataFrame and reindex  
+    cpy = df.copy().reset_index().set_index('geo11')
+
+    # Replace top-coded values with np.nan
+    col_name = "Median Value for Owner Occupied Housing Units"
+    cpy[col_name] = cpy[col_name].replace(-666666666, np.nan)
+
+    # Read the state-level shapefile into a GeoDataFrame
+    gdf = gpd.read_file(shpfile_path)
+    gdf.rename(columns={'GEOID10': 'geo11'}, inplace=True)
+    gdf.set_index('geo11', inplace=True)
+
+    # Merge with current ACS data
+    mrged = pd.merge(cpy, gdf, how='inner', left_index=True, right_index=True)
+    mrged = gpd.GeoDataFrame(mrged, crs=gdf.crs)
+
+    # Calculate weights and row-standardize
+    w = pysal.lib.weights.Queen.from_dataframe(mrged.reset_index(), idVariable='geo11')
+    w.transform = 'r'
+
+    # Fill nans with geometric mean if possible and column median otherwise
+    incomplete_tracts = mrged[mrged[col_name].isna()].index.values
+    for tract in incomplete_tracts:
+        mrged.loc[tract, col_name] = compute_gmean(mrged, tract, w, col_name)
+
+    # Compute spatial lag and append new column to DataFrame
+    scol_lag_name = "Median House Value Spatial Lag"
+    mrged[scol_lag_name] = lag_spatial(w, mrged[col_name].values)
+
+    # Compute Local Moran's statistic and append new column to DataFrame
+    scol_morans_name = "Median House Value Local Morans"
+    mrged[scol_morans_name] = Moran_Local(mrged[col_name].values, w).Is
+
+    # Normalize Local Moran's values
+    scaler = StandardScaler()
+    two_dim_values = mrged[scol_morans_name].to_numpy().reshape(-1, 2)
+    norm_data = scaler.fit_transform(two_dim_values).flatten()
+    mrged[scol_morans_name] = norm_data
+
+    # Finalize DataFrame to return
+    df = df.merge(mrged[["GEO_ID", scol_lag_name, scol_morans_name]], how="left", on="GEO_ID")
+    return df.set_index("GEO_ID")
+
+
+def _parse_config(config_folder_path, master_file_name="master.json"):
     '''
     Parses a set of configuration files to retrieve the geographies, tables,
     and variables used to build queries against the Census Bureau's Data API.
@@ -739,12 +828,15 @@ def _parse_config(config_folder_path):
     Parameters:
         config_folder_path (str): the path to the folder containing the JSON
                                   configuration files
+        master_file_name (str): the name of the master configuration file
+                                indicating what ACS source, cities, and years
+                                to parse. Defaults to "master.json".
 
     Returns:
         (ACSDataRequest): the data request
     '''
     # Retrieve ACS data source and cities and years of interest
-    with open(f"{config_folder_path}/master.json") as f:
+    with open(f"{config_folder_path}/master/{master_file_name}") as f:
         master_settings = json.load(f)
         acs = master_settings["acs"]
         cities = master_settings["cities"]
@@ -786,13 +878,9 @@ def _reshape_dataframe(df, variable_dict, year):
     Returns:
         (pd.DataFrame): a modified copy of the original DataFrame
     '''
-
-    # Replace variable code column names with meaningful labels
-    updated_df = df.rename(columns=variable_dict[year])
-
     # Update educational attainment column using custom logic
     compute_by_sex = year == 2010 or year == 2011
-    updated_df = _compute_percent_college_graduate(updated_df, compute_by_sex)
+    updated_df = _compute_percent_college_graduate(df, compute_by_sex)
 
     # Finalize remaining columns generated from table variables
     updated_df = _compute_percent_commute_time(updated_df)
@@ -808,17 +896,6 @@ def _reshape_dataframe(df, variable_dict, year):
     updated_df = _compute_percent_school_enrollment(updated_df)
     updated_df = _compute_percent_single_never_married(updated_df)
     updated_df = _compute_percent_white_collar(updated_df)
-
-    # Update index
-    updated_df = (updated_df
-        .reset_index()
-        .drop("index", axis="columns")
-        .set_index("GEO_ID")
-    )
-
-    # Add "geo11" column to facilitate later spatial joins
-    updated_df["geo11"] = updated_df.index.str[-11:]
-    updated_df["geo11"] = updated_df["geo11"].astype({'geo11': 'object'})
 
     return updated_df
   
@@ -862,7 +939,7 @@ def _write_output_files(df, acs, year, output_folder_path):
     )
 
 
-def orchestrate(config_folder_path, output_folder_path):
+def orchestrate(config_folder_path, output_folder_path, master_file_name="master.json"):
     '''
     Orchestrates the retrieval of ACS data from the Census Bureau API
     and saves the output to a set of CSV files.
@@ -872,14 +949,17 @@ def orchestrate(config_folder_path, output_folder_path):
                                   configuration files
         output_folder_path (str): the path to the folder containing the CSV
                                   output files
+        master_file_name (str): the name of the master configuration file
+                                indicating what ACS source, cities, and years
+                                to parse. Defaults to "master.json".
     
     Returns:
         (pd.DataFrame): a DataFrame with requested ACS data
     '''
-    # Get ACS data request
-    acsreq = _parse_config(config_folder_path)
+    # Parse ACS data request
+    acsreq = _parse_config(config_folder_path, master_file_name)
 
-    # Store DataFrames
+    # Initialize dictionary to store resulting DataFrames
     df_collection = {}
 
     # Process data for each year
@@ -887,15 +967,17 @@ def orchestrate(config_folder_path, output_folder_path):
 
         logging.info(f"Processing ACS data for {year}")
 
-        # Initialize DataFrame
+        # Initialize DataFrame for year
         df = pd.DataFrame()
 
-        # Retrieve variable codes (e.g. "B08303_003E") and add "GEO_ID"
+        # Retrieve variable codes (e.g., "B08303_003E") and add "GEO_ID"
         var_codes = list(acsreq.variables[year].keys())
         var_codes.append("GEO_ID")
 
-        # Retrieve census data from API
+        # Process data for each city
         for geomap in acsreq.geomaps:
+
+            # Retrieve census data from API
             logging.info(f"Calling API for {geomap.city.name}")
             temp_df = acsclient.get_census_tracts(
                 source=acsreq.acs,
@@ -903,13 +985,34 @@ def orchestrate(config_folder_path, output_folder_path):
                 geomapping=geomap,
                 var_codes=var_codes
             )
+
+            # Replace variable code column names with meaningful labels
+            temp_df = temp_df.rename(columns=acsreq.variables[year])
+
+             # Update index
+            temp_df = (temp_df
+                .reset_index()
+                .drop("index", axis="columns")
+                .set_index("GEO_ID")
+            )
+
+            # Add "geo11" column to facilitate later spatial joins
+            temp_df["geo11"] = temp_df.index.str[-11:]
+            temp_df["geo11"] = temp_df["geo11"].astype({'geo11': 'object'})
+
+            # Compute endogenous features
+            logging.info("Computing endogenous featuers for median housing price")
+            shpfile_path = f"{config_folder_path}/shpfiles/{geomap.state.name.lower()}"
+            temp_df = _compute_median_house_price_endo_features(temp_df, shpfile_path)
+
+            # Concatenate geo data to year's DataFrame
             df = pd.concat([df, temp_df])
             
-        # Reshape DataFrame
-        logging.info(f"Reshaping resulting DataFrame")
+        # Reshape DataFrame and add computed features
+        logging.info(f"Reshaping resulting DataFrame and adding computed features")
         df = _reshape_dataframe(df, acsreq.variables, year)
 
-        # Write to output csv
+        # Write to output csv file
         logging.info(f"Writing data to output CSV files")
         _write_output_files(df, acsreq.acs, year, output_folder_path)
 
@@ -923,4 +1026,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     config_folder_path = "acs/config"
     output_folder_path = "acs/outputs"
-    orchestrate(config_folder_path, output_folder_path)
+    orchestrate(config_folder_path, output_folder_path, "houston2010.json")
