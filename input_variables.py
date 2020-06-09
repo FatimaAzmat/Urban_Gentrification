@@ -8,7 +8,7 @@ Created on Sat Jun  6 00:03:51 2020
 
 ##Module to define global variables. User to change input
 
-#import os
+import os
 #
 ## System settings
 wd = os.getcwd()
