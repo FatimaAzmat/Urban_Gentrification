@@ -6,14 +6,18 @@ Created on Tue Jun  9 11:01:17 2020
 @author: manasip
 """
 
+
 import numpy as np
 import geopandas as gpd
 import os
 import pandas as pd
 import pysal
 from scipy.stats import gmean
+from sklearn.preprocessing import StandardScaler
+
 from userinput import SF_DICT, COUNTIES, SF, GEO_IL, GEO_DC, GEO_NY, GEO_CA, GEO_WA, GEO_PA, GEO_OR, GEO_GA, GEO_MN, \
 GEO_LA, GEO_NM, GEO_OK, GEO_TX, GEO_MA, GEO_NJ, GEO_MD, GEO_MI, GEO_FL, GEO_NC
+
 
 
 def chg_col(acs_data, colname="geo11"):
@@ -122,10 +126,23 @@ def impute_missing_values(acs_data):
     for state, counties in COUNTIES.items():
         for county in counties:
             fillna(acs_data, state, county)
-
-
+            
+            
+        
+def process_normalize(df_train, df_test, col):
+    '''
+    Function to normalize features to have mean 0 and std 1 with training dataset
     
+    Input
+        df_train(pandas dataframe): Train dataset
+        df_test(pandas dataframe): Test dataset
+        col(list of str): Features to be normalized
     
+    Output
+        df_train, df_test(tuple of dataframe): Normalized datasets
+    '''
+    scaler = StandardScaler()
+    df_train[col] = scaler.fit_transform(df_train[col])
+    df_test[col] = scaler.transform(df_test[col])
     
-
-
+    return df_train, df_test
