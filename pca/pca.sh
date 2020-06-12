@@ -5,6 +5,8 @@ do IFS=",";
 set $i;
     for trans in box_cox in_between untransformed
     do
-        python3 pca_analysis.py -b $1 -e $2 -t $trans
+        #python3 pca_analysis.py -b $1 -e $2 -t $trans -r
+        #python3 pca_analysis.py -b $1 -e $2 -t $trans -c
+        python3 pca_analysis.py -b $1 -e $2 -t $trans -x
     done
 done
