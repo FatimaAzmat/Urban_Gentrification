@@ -1,5 +1,7 @@
 '''
 acsclient.py
+@author: Launa Greer
+@last updated: June 9, 2020
 
 Provides access to American Community Survey (ACS) tables and variables
 created by the U.S. Census Bureau. 
@@ -88,5 +90,3 @@ def get_census_tracts(source, year, geomapping, var_codes):
         df = pd.concat([df, downloaded])
 
     return df
-
-    

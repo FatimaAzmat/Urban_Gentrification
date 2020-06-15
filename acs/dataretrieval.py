@@ -27,6 +27,78 @@ from sklearn.preprocessing import normalize, StandardScaler
 from typing import List
 
 
+def compute_gmean(df, tract, weights, column):
+    '''
+    Computes the geometric mean of the given column.
+    '''
+    # Compute county medians
+    county_median_df = df[["County", column]].groupby("County").median()
+
+    # Extract values from neighboring tracts, if any exist
+    neighbor_values = df.loc[weights.neighbors[tract], column].values
+    has_neighbors = not all(np.isnan(neighbor_values))
+
+    # Compute and return geometric mean
+    if has_neighbors:
+        active = neighbor_values[np.logical_not(np.isnan(neighbor_values))]
+        geomean = gmean(active)
+    else:
+        county = df.loc[tract, "County"]
+        geomean = county_median_df.loc[county][0]
+
+    return geomean
+
+
+def _compute_median_house_price_endo_features(df, shpfile_path):
+    '''
+    Computes two endogenous features (spatial lag and a Local Moran's statistic)
+    for the median value for owner occupied housing units in each tract.
+
+    Parameters:
+        df (pd.DataFrame): a DataFrame pertaining to a particular state
+        shpfile_path (str): the relative path to the state's shape file
+
+    Returns:
+        (pd.DataFrame): the updated DataFrame
+    '''
+    # Copy DataFrame and reindex  
+    cpy = df.copy().reset_index().set_index('geo11')
+
+    # Replace top-coded values with np.nan
+    col_name = "Median Value for Owner Occupied Housing Units"
+    cpy[col_name] = cpy[col_name].replace(-666666666, np.nan)
+
+    # Read the state-level shapefile into a GeoDataFrame
+    gdf = gpd.read_file(shpfile_path)
+    gdf.rename(columns={'GEOID10': 'geo11'}, inplace=True)
+    gdf.set_index('geo11', inplace=True)
+
+    # Merge with current ACS data
+    mrged = pd.merge(cpy, gdf, how='inner', left_index=True, right_index=True)
+    mrged = gpd.GeoDataFrame(mrged, crs=gdf.crs)
+
+    # Calculate weights and row-standardize
+    w = pysal.lib.weights.Queen.from_dataframe(mrged.reset_index(), idVariable='geo11')
+    w.transform = 'r'
+
+    # Fill nans with geometric mean if possible and column median otherwise
+    incomplete_tracts = mrged[mrged[col_name].isna()].index.values
+    for tract in incomplete_tracts:
+        mrged.loc[tract, col_name] = compute_gmean(mrged, tract, w, col_name)
+
+    # Compute spatial lag and append new column to DataFrame
+    scol_lag_name = "Median House Value Spatial Lag"
+    mrged[scol_lag_name] = lag_spatial(w, mrged[col_name].values)
+
+    # Compute Local Moran's statistic and append new column to DataFrame
+    scol_morans_name = "Median House Value Local Morans"
+    mrged[scol_morans_name] = Moran_Local(mrged[col_name].values, w).Is
+
+    # Finalize DataFrame to return
+    df = df.merge(mrged[["GEO_ID", scol_lag_name, scol_morans_name]], how="left", on="GEO_ID")
+    return df.set_index("GEO_ID")
+
+
 def _compute_percent_college_graduate(df, compute_by_sex=False):
     '''
     Adds a new column to the DataFrame to capture the percentage of census
@@ -740,78 +812,6 @@ def _compute_percent_white_collar(df):
         "Total Occupational Count",
         "Total White Collar Workers"
     ])
-
-
-def compute_gmean(df, tract, weights, column):
-    '''
-    Computes the geometric mean of the given column.
-    '''
-    # Compute county medians
-    county_median_df = df[["County", column]].groupby("County").median()
-
-    # Extract values from neighboring tracts, if any exist
-    neighbor_values = df.loc[weights.neighbors[tract], column].values
-    has_neighbors = not all(np.isnan(neighbor_values))
-
-    # Compute and return geometric mean
-    if has_neighbors:
-        active = neighbor_values[np.logical_not(np.isnan(neighbor_values))]
-        geomean = gmean(active)
-    else:
-        county = df.loc[tract, "County"]
-        geomean = county_median_df.loc[county][0]
-
-    return geomean
-
-
-def _compute_median_house_price_endo_features(df, shpfile_path):
-    '''
-    Computes two endogenous features (spatial lag and a Local Moran's statistic)
-    for the median value for owner occupied housing units in each tract.
-
-    Parameters:
-        df (pd.DataFrame): a DataFrame pertaining to a particular state
-        shpfile_path (str): the relative path to the state's shape file
-
-    Returns:
-        (pd.DataFrame): the updated DataFrame
-    '''
-    # Copy DataFrame and reindex  
-    cpy = df.copy().reset_index().set_index('geo11')
-
-    # Replace top-coded values with np.nan
-    col_name = "Median Value for Owner Occupied Housing Units"
-    cpy[col_name] = cpy[col_name].replace(-666666666, np.nan)
-
-    # Read the state-level shapefile into a GeoDataFrame
-    gdf = gpd.read_file(shpfile_path)
-    gdf.rename(columns={'GEOID10': 'geo11'}, inplace=True)
-    gdf.set_index('geo11', inplace=True)
-
-    # Merge with current ACS data
-    mrged = pd.merge(cpy, gdf, how='inner', left_index=True, right_index=True)
-    mrged = gpd.GeoDataFrame(mrged, crs=gdf.crs)
-
-    # Calculate weights and row-standardize
-    w = pysal.lib.weights.Queen.from_dataframe(mrged.reset_index(), idVariable='geo11')
-    w.transform = 'r'
-
-    # Fill nans with geometric mean if possible and column median otherwise
-    incomplete_tracts = mrged[mrged[col_name].isna()].index.values
-    for tract in incomplete_tracts:
-        mrged.loc[tract, col_name] = compute_gmean(mrged, tract, w, col_name)
-
-    # Compute spatial lag and append new column to DataFrame
-    scol_lag_name = "Median House Value Spatial Lag"
-    mrged[scol_lag_name] = lag_spatial(w, mrged[col_name].values)
-
-    # Compute Local Moran's statistic and append new column to DataFrame
-    scol_morans_name = "Median House Value Local Morans"
-    mrged[scol_morans_name] = Moran_Local(mrged[col_name].values, w).Is
-
-    # Finalize DataFrame to return
-    df = df.merge(mrged[["GEO_ID", scol_lag_name, scol_morans_name]], how="left", on="GEO_ID")
-    return df.set_index("GEO_ID")
 
 
 def _parse_config(config_folder_path, master_file_name="master.json"):

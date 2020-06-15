@@ -1,5 +1,7 @@
 '''
 models.py
+@author: Launa Greer
+@last updated: June 9, 2020
 
 Representations of ACS geographies and data requests.
 '''
