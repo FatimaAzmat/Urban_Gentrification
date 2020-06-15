@@ -6,7 +6,7 @@ Created on Tue Jun  9 10:28:40 2020
 @author: manasip
 """
 import os
-import pandas pd
+import pandas as pd
 import process as pp
 from userinput import dyr, ffolder, ffilename, sfolder, sfilename, wd
 
