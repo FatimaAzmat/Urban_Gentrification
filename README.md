@@ -1,6 +1,7 @@
 # Predicting Neighborhood Gentrification in the U.S.
 ## CAPP 30254 | Spring 2020
 
+<<<<<<< HEAD
 ## Project Members:  
 Fatima Azmat  
 Launa Greer  
@@ -64,3 +65,15 @@ pca
 (3) Run PCA analysis and generate outcome variables by running pca.sh.
 (4) Clean features.
 (5) Train and test random forest regression model using available notebooks.
+=======
+Summary
+
+
+
+Organisation
+
+- model - Core Jupyter notebook with regression models
+- clean - Jupyter notebook to clean features data
+
+Data Sources
+>>>>>>> f7f5c2347cbb82a3866dd201b7c180eed148b151

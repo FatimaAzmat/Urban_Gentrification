@@ -1,9 +1,9 @@
 """
 PCA Analysis
 @author: Marc Richardson
-@last updated: June 3, 2020
+@last updated: June 8, 2020
 
-Does the PCA analysis on the two datasets, saves the input and output to a csv
+Does the PCA analysis on the two datasets, saves the inputs and outputs to a csv
 """
 
 # import libraries
@@ -25,25 +25,19 @@ wd = os.getcwd()
 # Assumes a particular setup for the directories
 VARS = os.path.join(wd, 'ACS', 'SES Ascent Datasets')
 SF = os.path.join(wd, 'shapefiles')
-# GEO_IL = os.path.join(SF, 'tl_2010_17_tract10')
-# GEO_DC = os.path.join(SF, 'tl_2010_11_tract10')
-# GEO_NY = os.path.join(SF, 'tl_2010_36_tract10')
-# GEO_CA = os.path.join(SF, 'tl_2010_06_tract10')
-# GEO_WA = os.path.join(SF, 'tl_2010_53_tract10')
 OUTPUT = os.path.join(wd, 'scores')
+BY_CITY = os.path.join(wd, 'city_scores')
+RELATIVE_SCORES = os.path.join(wd, 'relative_rank')
+LOADINGS = os.path.join(wd, 'loadings')
+CITY_LOADINGS = os.path.join(LOADINGS, 'cities')
+DROP_MHC = os.path.join(wd, 'without_mhc')
 
 sys.path.insert(0, VARS)
-# sys.path.insert(1, GEO_IL)
-# sys.path.insert(2, GEO_DC)
-# sys.path.insert(3, GEO_NY)
-# sys.path.insert(4, GEO_CA)
-# sys.path.insert(5, GEO_WA)
 sys.path.insert(1, OUTPUT)
 
 # Local modules
 
 import dataset as ds
-from dataset import SF_DICT
 
 # Set random seed for replicability
 
@@ -60,28 +54,6 @@ VARS = ['per_white_collar',
         'median_housing_value',
         'median_hh_inc',
         'median_mhc']
-
-FIPS = {
-    'District of Columbia': '11',
-    'Washington': '53',
-    'California': '06',
-    'New York': '36',
-    'Illinois': '17',
-    'Pennsylvania': '42',
-    'Oregon': '41',
-    'Georgia': '13',
-    'Minnesota': '27',
-    'Louisiana': '22',
-    'New Mexico': '35',
-    'Oklahoma': '40',
-    'Texas': '48',
-    'Massachusetts': '25',
-    'New Jersey': '34',
-    'Maryland': '24',
-    'Michigan': '26',
-    'Florida': '12',
-    'North Carolina': '37'
-}
 
 # Helper functions for main
 
@@ -126,19 +98,38 @@ def do_pca(df1, df2):
     assert np.isfinite(array).any(), 'Error: array contains infinite values'
     assert ~np.isnan(array).any(), 'Error: array contains NaN values'
 
+    # Median removal and unit scaling
+
     scaler = preprocessing.RobustScaler()
     scaler.fit(array)
     array = scaler.transform(array)
 
+    # Generate loadings
+
+    pca_full = PCA()
+    pca_full.fit(array)
+
+    i = np.identity(array.shape[1])
+    coef = pca_full.transform(i)
+    components = coef.shape[1]
+    explained_variance = \
+        pca_full.explained_variance_ratio_.reshape(1, components)
+    loadings = np.concatenate((coef, explained_variance), axis=0)
+    loadings = pd.DataFrame(loadings,
+                            index=list(df1.columns) + ['Explained Variance'])
+
+    # Get first component for SES
+
     pca = PCA(n_components=1)
     pca.fit(array)
     scores = pd.DataFrame(pca.transform(array))
-    print(
-        "The amount of explained variance of the SES score is: {0:6.5f}".format(
-            pca.explained_variance_ratio_[0]))
+
+    # Disaggregate scores into separate years
 
     scores1 = scores.loc[:len(df1) - 1, 0]
     scores2 = scores.loc[len(df1):, 0]
+
+    # Add scores to original data
 
     df1 = df1.assign(scores=pd.Series(scores1).values)
     df2 = df2.assign(scores=pd.Series(scores2).values)
@@ -146,7 +137,7 @@ def do_pca(df1, df2):
     df = df1.merge(df2, how='outer', suffixes=('_pre', '_post'),
                    left_index=True, right_index=True)
 
-    return df
+    return df, loadings
 
 
 def compute_rank_ascent(df):
@@ -163,8 +154,12 @@ def compute_rank_ascent(df):
     df.loc[:, 'scores_pr_asc'] = df.loc[:, 'scores_pr_post'] - \
         df.loc[:, 'scores_pr_pre']
 
+    # Get inputs used in PCA
+
     inp = df.loc[:, \
           [x for x in df.columns if 'score' not in x and 'rank' not in x]]
+
+    # Get scores and ranks
 
     scores = df.loc[:, \
              [x for x in df.columns if 'score' in x or 'rank' in x]]
@@ -177,21 +172,29 @@ if __name__ == "__main__":
     # Parse command line arguments
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-b", "--begin", help="Input starting year", required=True, type=int)
-    parser.add_argument(
-        "-e", "--end", help="Input ending year", required=True, type=int)
-    # parser.add_argument(
-    #     "-g", "--geometry",
-    #     help="Use spatial analysis to compute missing values",
-    #     action='store_true')
+
+    parser.add_argument("-b", "--begin", help="Input starting year",
+                        required=True, type=int)
+
+    parser.add_argument("-e", "--end", help="Input ending year",
+                        required=True, type=int)
+
     parser.add_argument("-t", "--transform", help="Input transformation",
                         required=True, type=str)
+
+    parser.add_argument("-r", "--relative", help="Generate relative ranks",
+                        default=False, action="store_true")
+
+    parser.add_argument("-c", "--city", help="Generate scores within cities",
+                        default=False, action="store_true")
+
+    parser.add_argument("-x", "--exclude", help="Exclude monthly housing cost",
+                        default=False, action="store_true")
+
     args = parser.parse_args()
 
     # Check that arguments are valid
 
-    # print(args.begin, args.end, args.transform)
     assert args.transform in ['box_cox', 'in_between', 'untransformed'], \
         'Invalid transformation'
     assert args.begin in range(2010, 2019), 'Invalid beginning year'
@@ -208,27 +211,19 @@ if __name__ == "__main__":
     dataSet1.impute_missing_values()
     dataSet2.impute_missing_values()
 
-    # if args.geometry:
-
-        # for state, sf in SF_DICT.items():
-        #     print("Filling values for {}\n".format(state))
-        #     print("\t" + str(args.begin) + "...\n")
-        #     dataSet1.fillna(state, gmean=True, shapefile=sf)
-        #     print("\t" + str(args.end) + "...\n")
-        #     dataSet2.fillna(state, gmean=True, shapefile=sf)
-    # else:
-    #     dataSet1.fillna()
-    #     dataSet2.fillna()
-
     if not dataSet1.are_tracts_same(dataSet2):
         print('Warning: the two datasets have sets of tracts that do not match'
               '\tDropping dissimilar tracts datasets...')
         dataSet1.make_tracts_same(dataSet2)
 
-    print('Gathering columns for PCA')
+    print('Gathering columns for PCA...\n')
 
-    df1 = dataSet1.get_pca_vars()
-    df2 = dataSet2.get_pca_vars()
+    if args.exclude:
+        df1 = dataSet1.get_pca_vars(exclude_mhc=True)
+        df2 = dataSet2.get_pca_vars(exclude_mhc=True)
+    else:
+        df1 = dataSet1.get_pca_vars()
+        df2 = dataSet2.get_pca_vars()
 
     print('Transforming data using specified transformation...\n')
 
@@ -237,9 +232,58 @@ if __name__ == "__main__":
 
     print('Doing PCA analysis...\n')
 
-    scores = do_pca(transformed[0], transformed[1])
+    if not os.path.exists(LOADINGS):
+        os.mkdir(LOADINGS)
 
-    inputs, output = compute_rank_ascent(scores)
+    if args.city:
+
+        if not os.path.exists(CITY_LOADINGS):
+            os.mkdir(CITY_LOADINGS)
+
+        scores = pd.DataFrame()
+
+        cities = dataSet1.data.groupby('Affiliated City').groups.items()
+
+        for city, idxs in cities:
+            if city == "Austin":
+                continue
+            city_pre, city_post = transformed
+            city_pre = city_pre.loc[idxs, :]
+            city_post = city_post.loc[idxs, :]
+            city_scores, loadings = do_pca(city_pre, city_post)
+            scores = pd.concat((scores, city_scores))
+            loadings_file = os.path.join(CITY_LOADINGS, str(args.transform) +
+                                         '_' + city + '_' + 'loadings' + '_' +
+                                         str(args.begin) + '_' + str(args.end)
+                                         + '.csv')
+            loadings.to_csv(loadings_file)
+
+    else:
+
+        scores, loadings = do_pca(transformed[0], transformed[1])
+
+        if not args.exclude:
+            loadings_file = os.path.join(LOADINGS, str(args.transform) +
+                                         '_loadings_' + str(args.begin) +
+                                         '_' + str(args.end) + '.csv')
+            loadings.to_csv(loadings_file)
+
+    print("Computing SES rank, percent rank, ascent, and percent ascent...\n")
+
+    if args.relative:
+
+        inputs = pd.DataFrame()
+        output = pd.DataFrame()
+
+        for idxs in dataSet1.data.groupby('Affiliated City').groups.values():
+            by_city = scores.loc[idxs, :]
+            input_, output_ = compute_rank_ascent(by_city)
+            inputs = pd.concat((inputs, input_))
+            output = pd.concat((output, output_))
+
+    else:
+
+        inputs, output = compute_rank_ascent(scores)
 
     print('Saving inputs and output to files...\n')
 
@@ -248,10 +292,47 @@ if __name__ == "__main__":
     output_file = (str(args.transform) + '_ses_' + str(args.begin) + '_' +
                    str(args.end) + '.csv')
 
-    if not os.path.exists(OUTPUT):
-        os.mkdir(OUTPUT)
+    if args.city:
 
-    inputs.to_csv(os.path.join(OUTPUT, inputs_file), index=True)
-    output.to_csv(os.path.join(OUTPUT, output_file), index=True)
+        if not os.path.exists(BY_CITY):
+            os.mkdir(BY_CITY)
 
-    print('Done')
+        inputs.to_csv(os.path.join(BY_CITY, inputs_file), index=True)
+        output.to_csv(os.path.join(BY_CITY, output_file), index=True)
+
+    if args.relative:
+
+        if not os.path.exists(RELATIVE_SCORES):
+            os.mkdir(RELATIVE_SCORES)
+
+        inputs.to_csv(os.path.join(RELATIVE_SCORES, inputs_file), index=True)
+        output.to_csv(os.path.join(RELATIVE_SCORES, output_file), index=True)
+
+    if not args.relative and not args.city and not args.exclude:
+
+        if not os.path.exists(OUTPUT):
+            os.mkdir(OUTPUT)
+
+        inputs.to_csv(os.path.join(OUTPUT, inputs_file), index=True)
+        output.to_csv(os.path.join(OUTPUT, output_file), index=True)
+
+    if args.exclude:
+
+        if not os.path.exists(DROP_MHC):
+            os.mkdir(DROP_MHC)
+
+        loadings_dir = os.path.join(DROP_MHC, 'loadings')
+
+        if not os.path.exists(loadings_dir):
+            os.mkdir(loadings_dir)
+
+        loadings_file = os.path.join(loadings_dir, str(args.transform) +
+                                     '_loadings_' + str(args.begin) +
+                                     '_' + str(args.end) + '.csv')
+
+        inputs.to_csv(os.path.join(DROP_MHC, inputs_file), index=True)
+        output.to_csv(os.path.join(DROP_MHC, output_file), index=True)
+        loadings.to_csv(loadings_file)
+
+
+    print('Done ######################################################\n\n\n')

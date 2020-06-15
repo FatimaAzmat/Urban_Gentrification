@@ -2,7 +2,7 @@
 ACSData class for PCA pre-processing
 
 @author: Marc Richardson
-@last updated: June 3, 2020
+@last updated: June 8, 2020
 """
 
 # import libraries
@@ -51,7 +51,8 @@ DTYPE = {
     'Total Population': np.float64,
     'geo11': str,
     'State': str,
-    'County': str
+    'County': str,
+    'Affiliated City': str
 }
 
 COL_NAMES = {
@@ -114,7 +115,6 @@ COUNTIES = {'California': ['Los Angeles',
             'Washington': ['King County']
             }
 
-# CHANGED = {'06037137000', '06037930401', '36085008900'}
 # helper function for loading data
 
 def convert_acs_encoding(df):
@@ -193,9 +193,16 @@ class ACSData:
         return match
 
 
-    def get_pca_vars(self):
+    def get_pca_vars(self, exclude_mhc=False):
 
-        return self.data[[x for x in self.columns if x in COL_NAMES.values()]]
+        if exclude_mhc:
+            cols = \
+                [x for x in self.columns if x in COL_NAMES.values() \
+                 and x != 'median_mhc']
+        else:
+            cols = [x for x in self.columns if x in COL_NAMES.values()]
+
+        return self.data[cols]
 
 
     def merge_geodata(self, state, county):
@@ -228,14 +235,14 @@ class ACSData:
                                                    idVariable='geo11')
 
         nans = self.findna()
-        print(f"\tFilling missing values for {county} in {state}\n")
+        # print(f"\tFilling missing values for {county} in {state}\n")
         for col in nans:
             tracts = df[df[col].isna()].index.values
             if not len(tracts):
-                print('\t\tNo tracts with missing values\n')
+                # print('\t\tNo tracts with missing values\n')
                 continue
-            print('\t\tFilling missing values in {} for {} tracts\n'.format(col, len(tracts)))
-            print('\t\tTracts: {}\n'.format(tracts))
+            # print('\t\tFilling missing values in {} for {} tracts\n'.format(col, len(tracts)))
+            # print('\t\tTracts: {}\n'.format(tracts))
             for tract in tracts:
                 m = self.get_gmean_from_neighbors(w, df, tract, col)
                 self.data.loc[tract, col] = m
@@ -257,7 +264,7 @@ class ACSData:
             geomean = \
                 gmean(neighbor_values[np.logical_not(np.isnan(neighbor_values))])
         else:
-            print(f'\t\t\t\tNo neighbors found for {tract}... Using county median\n')
+            # print(f'\t\t\t\tNo neighbors found for {tract}... Using county median\n')
             geomean = df[column].median()
         # print("\t\t\t\tMean found: ", geomean)
         # print()
