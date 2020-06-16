@@ -1,14 +1,13 @@
 '''
+vishelper.py
+@author: Launa Greer
+@last updated: June 15, 2020
+
+Facilitates the creation of a data report for a given city.
 '''
-import matplotlib.pyplot as plt
+# General data analysis
 import pandas as pd
 import numpy as np
-import geopandas as gpd
-from IPython.display import display, HTML
-
-# Graphing
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 # Spatial analysis
 import pysal
@@ -17,9 +16,15 @@ from esda import Moran_Local
 from scipy.stats import gmean
 from splot.esda import lisa_cluster
 
+# Graphing and display
+import matplotlib.pyplot as plt
+import seaborn as sns
+import geopandas as gpd
+from IPython.display import display, HTML
+
 
 # Define variables
-DEM_VARS = [
+AGE_VARS = [
     "Median Age",
     "Female Median Age",
     "Male Median Age",
@@ -82,10 +87,7 @@ def clean_city(city_df, drop_tracts=True):
         tracts_to_drop = list(city_df[city_df['Total Population'] == 0]["geo11"].astype(str))
 
         # Drop tracts from across all years
-        print(f'''
-            Dropping the following {len(tracts_to_drop)} unpopulated
-            tracts across all years:\n{', '.join(tracts_to_drop)}\n
-            ''')
+        print(f'''Dropping the following {len(tracts_to_drop)} unpopulated tracts across all years:\n\n{', '.join(tracts_to_drop)}\n''')
 
         retain_tract_func = lambda c: str(c) not in tracts_to_drop
         retained_df = city_df[city_df["geo11"].apply(retain_tract_func)]
@@ -93,10 +95,7 @@ def clean_city(city_df, drop_tracts=True):
         new_num_tracts = len(retained_df)
         city_df = retained_df
 
-        print(f'''
-            {original_num_tracts - new_num_tracts} total rows dropped, 
-            leaving {new_num_tracts} left
-        ''')
+        print(f'''{original_num_tracts - new_num_tracts} total rows dropped, leaving {new_num_tracts} left''')
 
     # Replace top-coded values
     city_df = city_df.replace(-666666666, np.nan)
@@ -125,21 +124,15 @@ def join_city_with_shapefile(city_df):
     gdf = gdf.astype({"geo11":"str"})
     city_gdf = pd.merge(city_df, gdf, how='inner', on="geo11")
     city_gdf = gpd.GeoDataFrame(city_gdf, crs=gdf.crs)
-
-    # Compute weights
-    weights = pysal.lib.weights.Queen.from_dataframe(gdf.reset_index(), idVariable="geo11")
-    weights.transform = 'r'
     
-    return city_gdf, weights
+    return city_gdf
 
 
 def map_net_change(city_gdf, col_name, start_year, end_year, cmap="seismic"):
     '''
-    
+    Maps the net change for a given column across all tracts between a
+    start year and an end year.
     '''
-    title = f"Net Change in {col_name}, {start_year} to {end_year}"
-    display(HTML(f"<h3>{title}</h3>"))
-
     # Subset data for each year
     start = city_gdf[city_gdf["Year"] == start_year][["Year", "geo11", "geometry", col_name]]
     end = city_gdf[city_gdf["Year"] == end_year][["Year", "geo11", col_name]]
@@ -172,14 +165,13 @@ def map_net_change(city_gdf, col_name, start_year, end_year, cmap="seismic"):
     axes.set_ylabel("Latitude", {'fontsize': 15, 'fontweight' : 'bold'})
 
 
-def map_time_lapse(city_gdf, col_name):
+def map_time_lapse(city_gdf, col_name, cmap="magma"):
     '''
     Plots a time lapse of a feature column for a given city.
     
     Parameters:
         city_gdf (gpd.GeoDataFrame): a GeoDataFrame containing data for all years
     '''
-    display(HTML(f"<h3>Time Lapse of {col_name}, 2010-2018</h3>"))
     
     # Make plots
     fig, axes_grid = plt.subplots(3, 3, sharex='all', sharey='all', figsize=(30,30))
@@ -203,6 +195,7 @@ def map_time_lapse(city_gdf, col_name):
         subset.plot(
             ax=axes_dict[year],
             column=col_name,
+            cmap=cmap,
             figsize=(25, 25),
             edgecolor="none",
             legend=False,
@@ -233,8 +226,50 @@ def map_time_lapse(city_gdf, col_name):
                       orientation="vertical")
 
 
+def map_local_moran(city_gdf, local_moran_dict):
+    '''
+    Maps Local Moran's statistics against a geography to indicate high-high
+    ("HH"), low-low ("LL"), high-low ("HL"), and low-high ("LH") areas of
+    spatial correlation.
+    '''
+    display(HTML(f"<h3>Moran Local Spatial Autocorrelation, 2010-2018</h3>"))
+    col_name = "Median Value for Owner Occupied Housing Units"
+
+    # Make plots
+    fig, axes_grid = plt.subplots(3, 3, sharex='all', sharey='all', figsize=(30,30))
+    plt.subplots_adjust(wspace=0.01, right = 0.5, top=0.5)
+    axes_dict = {}
+    axes_dict[2010] = axes_grid[0][0]
+    axes_dict[2011] = axes_grid[0][1]
+    axes_dict[2012] = axes_grid[0][2]
+    axes_dict[2013] = axes_grid[1][0]
+    axes_dict[2014] = axes_grid[1][1]
+    axes_dict[2015] = axes_grid[1][2]
+    axes_dict[2016] = axes_grid[2][0]
+    axes_dict[2017] = axes_grid[2][1]
+    axes_dict[2018] = axes_grid[2][2]
+    
+    # Make subplots
+    for year in range(2010, 2019):
+        axes = axes_dict[year]
+        axes.set_title(year, fontsize=16, fontweight="bold")
+        x_label = axes.get_xaxis().get_label().set_visible(False)
+        y_label = axes.get_yaxis().get_label().set_visible(False)
+
+        subset = city_gdf.query("`Year` == @year")[["Year", "geo11", "geometry", "County", col_name]].set_index("geo11")
+        lisa_cluster(local_moran_dict[year], subset, p=0.05, figsize=(10,10), ax=axes)
+
+    # Add a big axis, hide frame
+    ax_invis = fig.add_subplot(111, frameon=False)
+    ax_invis.grid(False)
+
+    # Hide tick and tick label of the big axis
+    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+
+
 def plot_local_moran_time_lapse(city_gdf):
     '''
+    Makes a series of scatterplots of Local Moran values from 2010-2018.
     '''
     def compute_gmean(df, tract, weights, column):
         '''
@@ -257,8 +292,8 @@ def plot_local_moran_time_lapse(city_gdf):
             
         return geomean
     
-    display(HTML(f"<h3>Chicago | Moran Local Scatterplot of Median Housing Value (2010-18), p=0.05</h3>"))
-    graph_pairs = []
+    display(HTML(f"<h3>Moran Local Scatterplot of Median Housing Value (2010-18), p=0.05</h3>"))
+    local_moran_dict = {}
     
     # Make plots
     col_name = "Median Value for Owner Occupied Housing Units"
@@ -275,7 +310,7 @@ def plot_local_moran_time_lapse(city_gdf):
     axes_dict[2017] = axes_grid[2][1]
     axes_dict[2018] = axes_grid[2][2]
     
-    # 
+    # For each year from 2010 through 2018
     for year in range(2010, 2019):
         # Subset data
         subset = city_gdf.query("`Year` == @year")[["Year", "geo11", "geometry", "County", col_name]].set_index("geo11")
@@ -289,7 +324,6 @@ def plot_local_moran_time_lapse(city_gdf):
         for tract in incomplete_tracts:
             subset.loc[tract, col_name] = compute_gmean(subset, tract, weights, col_name)
             
-
         local_morans = Moran_Local(subset[col_name].values, weights)
         moran_scatterplot(local_morans, p=0.05, ax=axes_dict[year])
         
@@ -297,7 +331,7 @@ def plot_local_moran_time_lapse(city_gdf):
         y_label = axes_dict[year].get_yaxis().get_label().set_visible(False)
         axes_dict[year].set_title(year, fontsize=16, fontweight="bold")
         
-        graph_pairs.append((local_morans, subset))
+        local_moran_dict[year] = local_morans
         
     # add a big axis, hide frame
     ax_invis = fig.add_subplot(111, frameon=False)
@@ -311,7 +345,7 @@ def plot_local_moran_time_lapse(city_gdf):
     #plt.suptitle("Chicago | Moran Local Scatterplot of Median Housing Value (2010-18)", ha="center")
     plt.savefig("scatterplot_moran.png", dpi="figure", bbox_inches='tight', pad_inches = 0)
     
-    return graph_pairs
+    return local_moran_dict
 
 
 def plot_histogram(df, col_name, bins, title, xlabel, ylabel):
@@ -342,7 +376,7 @@ def plot_histogram(df, col_name, bins, title, xlabel, ylabel):
 
 def plot_regplot_time_lapse(city_gdf, col_name_x, col_name_y):
     '''
-    C
+    Makes a regression plot of two variables from 2010-2018.
     '''
     display(HTML(f"<h3>{col_name_x} vs. {col_name_y}, 2010-2018</h3>"))
     
@@ -387,18 +421,130 @@ def plot_regplot_time_lapse(city_gdf, col_name_x, col_name_y):
 
 def create_city_geoframe(df_dict, years, city_name):
     '''
+    Creates a city GeoDataFrame.
     '''
     city_df = retrieve_city(df_dict, years, city_name)
     city_df = clean_city(city_df)
-    city_gdf, weights = join_city_with_shapefile(city_df)
+    city_gdf = join_city_with_shapefile(city_df)
 
-    return city_gdf, weights
+    return city_gdf
 
 
 def display_statistics(city_gdf, col_names):
     '''
+    Displays basic descriptive statistic for a column in a city GeoDataFrame.
     '''
     subset = city_gdf[col_names]
-    display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
     display(subset.describe().transpose())
 
+
+def run_report(city_gdf):
+    '''
+    Generates a data report for a given city.
+    '''
+    # AGE
+    display(HTML("<h2>Age</h2>"))
+    display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
+    display_statistics(city_gdf, AGE_VARS)
+
+    display(HTML("<h3>Time Lapse of Median Age, 2010-2018</h3>"))
+    map_time_lapse(city_gdf, "Median Age", cmap="magma")
+    plt.pause(2)
+
+    display(HTML("<h3>Net Change in Median Age, 2010-2018</h3>"))
+    map_net_change(city_gdf, "Median Age", 2010, 2018, cmap="seismic")
+    plt.pause(2)
+
+    # RACE
+    display(HTML("<h2>Race</h2>"))
+    display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
+    display_statistics(city_gdf, RACE_VARS)
+
+    display(HTML("<h3>Time Lapse of Median Age, 2010-2018</h3>"))
+    map_time_lapse(city_gdf, "Median Age", cmap="magma")
+    plt.pause(2)
+
+    display(HTML("<h3>Net Change in Percent White, 2010-2018</h3>"))
+    map_net_change(city_gdf, "Percent White", 2010, 2018, cmap="seismic")
+    plt.pause(2)
+
+    # MEDIAN ANNUAL HOUSEHOLD INCOME
+    display(HTML("<h2>Median Annual Household Income</h2>"))
+    display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
+    display_statistics(city_gdf, "Median Annual Household Income")
+    sns.boxplot(x=city_gdf["Median Annual Household Income"])
+
+    display(HTML("<h3>Time Lapse of Median Annual Household Income, 2010-2018</h3>"))
+    map_time_lapse(city_gdf, "Median Annual Household Income", cmap="magma")
+    plt.pause(2)
+
+    display(HTML("<h3>Net Change in Median Annual Household Income, 2010-2018</h3>"))
+    map_net_change(city_gdf, "Median Annual Household Income", 2010, 2018, cmap="seismic")
+    plt.pause(2)
+
+    # MEDIAN MONTHLY HOUSING COSTS
+    display(HTML("<h2>Median Monthly Housing Costs</h2>"))
+    display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
+    display_statistics(city_gdf, "Median Monthly Housing Costs")
+    sns.boxplot(x=city_gdf["Median Monthly Housing Costs"])
+
+    display(HTML("<h3>Time Lapse of Median Monthly Housing Costs, 2010-2018</h3>"))
+    map_time_lapse(city_gdf, "Median Monthly Housing Costs", cmap="magma")
+    plt.pause(2)
+
+    display(HTML("<h3>Net Change in Median Monthly Housing Costs, 2010-2018</h3>"))
+    map_net_change(city_gdf, "Median Monthly Housing Costs", 2010, 2018, cmap="seismic")
+    plt.pause(2)
+
+    # PERCENT WHITE COLLAR
+    display(HTML("<h2>Percent White Collar</h2>"))
+    display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
+    display_statistics(city_gdf, "Percent White Collar")
+    sns.boxplot(x=city_gdf["Percent White Collar"])
+
+    display(HTML("<h3>Time Lapse of Percent White Collar, 2010-2018</h3>"))
+    map_time_lapse(city_gdf, "Percent White Collar", cmap="magma")
+    plt.pause(2)
+
+    display(HTML("<h3>Net Change in Percent White Collar, 2010-2018</h3>"))
+    map_net_change(city_gdf, "Percent White Collar", 2010, 2018, cmap="seismic")
+    plt.pause(2)
+
+    # PERCENT COLLEGE GRADUATE
+    display(HTML("<h2>Percent College Graduate</h2>"))
+    display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
+    display_statistics(city_gdf, "Percent College Graduate")
+    sns.boxplot(x=city_gdf["Percent College Graduate"])
+
+    display(HTML("<h3>Time Lapse of Percent College Graduate, 2010-2018</h3>"))
+    map_time_lapse(city_gdf, "Percent College Graduate", cmap="magma")
+    plt.pause(2)
+
+    display(HTML("<h3>Net Change in Percent College Graduate, 2010-2018</h3>"))
+    map_net_change(city_gdf, "Percent College Graduate", 2010, 2018, cmap="seismic")
+    plt.pause(2)
+
+    # MEDIAN VALUE FOR OWNER-OCCUPIED HOUSING UNITS
+    display(HTML("<h2>Median Value for Owner Occupied Housing Units</h2>"))
+    display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
+    display_statistics(city_gdf, "Median Value for Owner Occupied Housing Units")
+    sns.boxplot(x=city_gdf["Median Value for Owner Occupied Housing Units"])
+
+    display(HTML("<h3>Time Lapse of Median Value for Owner Occupied Housing Units, 2010-2018</h3>"))
+    map_time_lapse(city_gdf, "Median Value for Owner Occupied Housing Units", cmap="magma")
+    plt.pause(2)
+
+    display(HTML("<h3>Net Change in Median Value for Owner Occupied Housing Units, 2010-2018</h3>"))
+    map_net_change(city_gdf, "Median Value for Owner Occupied Housing Units", 2010, 2018, cmap="seismic")
+    plt.pause(2)
+
+    display(HTML("<h3>Median Home Value Spatial Lag, 2010-2018</h3>"))
+    city_gdf["Median Home Value"] = city_gdf["Median Value for Owner Occupied Housing Units"] / 1000
+    city_gdf["Median Home Value Spatial Lag"] = city_gdf["Median House Value Spatial Lag"] / 1000
+    plot_regplot_time_lapse(city_gdf, "Median Home Value", "Median Home Value Spatial Lag")
+    plt.pause(2)
+
+    local_moran_dict = plot_local_moran_time_lapse(city_gdf)
+    plt.pause(2)
+
+    map_local_moran(city_gdf, local_moran_dict)
