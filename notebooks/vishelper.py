@@ -342,9 +342,6 @@ def plot_local_moran_time_lapse(city_gdf):
     plt.xlabel("Median Housing Value", fontsize=15, fontweight="bold")
     plt.ylabel("Spatial Lag of Median Housing Value", fontsize=15, fontweight="bold")
     
-    #plt.suptitle("Chicago | Moran Local Scatterplot of Median Housing Value (2010-18)", ha="center")
-    plt.savefig("scatterplot_moran.png", dpi="figure", bbox_inches='tight', pad_inches = 0)
-    
     return local_moran_dict
 
 
@@ -438,10 +435,13 @@ def display_statistics(city_gdf, col_names):
     display(subset.describe().transpose())
 
 
-def run_report(city_gdf):
+def run_report(city_gdf, city_name):
     '''
     Generates a data report for a given city.
     '''
+    # MAIN TITLE
+    display(HTML(F"<h1>{city_name}</h1>"))
+
     # AGE
     display(HTML("<h2>Age</h2>"))
     display(HTML("<h3>Statistics for All Tracts and Years</h3>"))
